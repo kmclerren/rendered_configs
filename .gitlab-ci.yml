@@ -1,0 +1,41 @@
+image: ansible-custom:latest
+
+before_script:
+  # run ssh-agent
+  - mkdir -p ~/.ssh
+  - eval $(ssh-agent -s)
+  - ssh-add <(echo "$SSH_PRIVATE_KEY")
+  - echo -e "Host *\n\tStrictHostKeyChecking no\n\n" > ~/.ssh/config
+  - export ANSIBLE_CONFIG=./ansible.cfg
+
+stages:
+  - build
+  - approve
+  - deploy
+
+build:
+  stage: build
+  only:
+    - master
+  script:
+    - git diff --name-only $CI_COMMIT_BEFORE_SHA $CI_COMMIT_SHA
+    - git clone git@GITLABURL.com/config_push.git
+    - ./config_push/check-ansible.sh
+
+approve:
+  stage: approve
+  when: manual
+  allow_failure: false
+  only:
+    - master
+  script:
+    - echo "Approval required to advance."
+
+deploy:
+  stage: deploy
+  only:
+  - master
+  script:
+    - git diff --name-only $CI_COMMIT_BEFORE_SHA $CI_COMMIT_SHA
+    - git clone git@GITLABURL.com/config_push.git
+    - ./config_push/commit-ansible.sh
